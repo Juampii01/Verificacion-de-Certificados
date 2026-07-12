@@ -6,6 +6,7 @@ export default function Admin() {
   const [tab, setTab] = useState("single");
   const [out, setOut] = useState("");
   const [busy, setBusy] = useState(false);
+  const [requests, setRequests] = useState(null);
 
   const [form, setForm] = useState({
     first_name: "", last_name: "", email: "",
@@ -78,6 +79,54 @@ export default function Admin() {
     setBusy(false);
   }
 
+  async function submitEligibleBulk(e) {
+    e.preventDefault();
+    const file = e.target.file.files[0];
+    if (!file) { setOut("Elegí un archivo Excel o CSV."); return; }
+    setBusy(true); setOut("Procesando lista de elegibles...");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/eligible-participants/bulk", {
+        method: "POST", headers: { "x-admin-token": token }, body: fd,
+      });
+      const j = await res.json();
+      if (!res.ok) { setOut("ERROR: " + JSON.stringify(j, null, 2)); }
+      else { setOut(`✓ ${j.importados} de ${j.total} emails cargados a la lista de elegibles.`); }
+    } catch (err) { setOut("ERROR: " + err.message); }
+    setBusy(false);
+  }
+
+  async function loadRequests() {
+    setBusy(true); setOut("");
+    try {
+      const res = await fetch("/api/certificate-requests", { headers: { "x-admin-token": token } });
+      const j = await res.json();
+      if (!res.ok) { setOut("ERROR: " + JSON.stringify(j, null, 2)); }
+      else { setRequests(j.requests); }
+    } catch (err) { setOut("ERROR: " + err.message); }
+    setBusy(false);
+  }
+
+  async function decideRequest(id, action) {
+    setBusy(true); setOut("");
+    try {
+      const res = await fetch(`/api/certificate-requests/${id}/${action}`, {
+        method: "POST", headers: { "x-admin-token": token },
+      });
+      const j = await res.json();
+      if (!res.ok) { setOut("ERROR: " + JSON.stringify(j, null, 2)); }
+      else {
+        const emailNote = j.email_sent ? "" : `\n⚠ El email NO se pudo enviar: ${j.email_error}`;
+        setOut((action === "approve"
+          ? `✓ Certificado ${j.certificate_number} creado.`
+          : `✓ Solicitud rechazada.`) + emailNote);
+        await loadRequests();
+      }
+    } catch (err) { setOut("ERROR: " + err.message); }
+    setBusy(false);
+  }
+
   return (
     <main className="admin">
       <h1>Panel administrativo · Certificados</h1>
@@ -91,10 +140,13 @@ export default function Admin() {
       <div className="tabs">
         <div className={`tab ${tab === "single" ? "active" : ""}`} onClick={() => setTab("single")}>Alta individual</div>
         <div className={`tab ${tab === "bulk" ? "active" : ""}`} onClick={() => setTab("bulk")}>Carga masiva (Excel/CSV)</div>
+        <div className={`tab ${tab === "requests" ? "active" : ""}`}
+             onClick={() => { setTab("requests"); loadRequests(); }}>Solicitudes pendientes</div>
+        <div className={`tab ${tab === "eligible" ? "active" : ""}`} onClick={() => setTab("eligible")}>Lista de elegibles (día 4)</div>
         <div className="tab" onClick={exportCanva} title="Descarga el CSV con datos + URL del QR para Canva Bulk Create">⬇ CSV para Canva</div>
       </div>
 
-      {tab === "single" ? (
+      {tab === "single" && (
         <form className="form-grid" onSubmit={submitSingle}>
           <label>Nombre<input value={form.first_name} onChange={set("first_name")} /></label>
           <label>Apellido *<input value={form.last_name} onChange={set("last_name")} required /></label>
@@ -119,7 +171,9 @@ export default function Admin() {
             </button>
           </div>
         </form>
-      ) : (
+      )}
+
+      {tab === "bulk" && (
         <form onSubmit={submitBulk}>
           <p className="muted">
             El archivo debe tener columnas: <b>Nombre, Apellido, Correo, Programa, Fecha de emisión, Número de certificado</b> (el número es opcional; si va vacío se genera solo).
@@ -128,6 +182,53 @@ export default function Admin() {
           <div style={{ marginTop: 14 }}>
             <button className="btn" style={{ padding: "12px 22px" }} disabled={busy}>
               {busy ? "Procesando..." : "Cargar y crear certificados"}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {tab === "requests" && (
+        <div>
+          <p className="muted">
+            Solicitudes hechas desde el formulario público (<code>/request</code>) que no matchearon
+            automáticamente contra la lista de elegibles. Aprobá para crear el certificado y avisar
+            por email, o rechazá para avisar que quedó sin aprobar.
+          </p>
+          <button className="btn" style={{ padding: "8px 16px", marginBottom: 14 }} onClick={loadRequests} disabled={busy}>
+            {busy ? "Cargando..." : "↻ Actualizar lista"}
+          </button>
+          {requests && requests.length === 0 && <p className="muted">No hay solicitudes pendientes.</p>}
+          {requests && requests.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {requests.map((r) => (
+                <div key={r.id} style={{ border: "1px solid #eee", borderRadius: 8, padding: 14, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+                  <div>
+                    <div style={{ fontWeight: 700, color: "var(--navy)" }}>{r.full_name}</div>
+                    <div className="muted">{r.email} · {r.first_name} {r.last_name}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button className="btn" disabled={busy} onClick={() => decideRequest(r.id, "approve")}>Aprobar</button>
+                    <button className="btn" style={{ background: "var(--red)" }} disabled={busy} onClick={() => decideRequest(r.id, "reject")}>Rechazar</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "eligible" && (
+        <form onSubmit={submitEligibleBulk}>
+          <p className="muted">
+            Subí la lista de quienes completaron el día 4 (columnas: <b>Nombre, Apellido, Correo</b>).
+            Cuando alguien pida su certificado en <code>/request</code> con un email de esta lista,
+            se aprueba y envía automáticamente. Se puede volver a subir para agregar más gente
+            (no duplica, actualiza por email).
+          </p>
+          <input type="file" name="file" accept=".xlsx,.xls,.csv" />
+          <div style={{ marginTop: 14 }}>
+            <button className="btn" style={{ padding: "12px 22px" }} disabled={busy}>
+              {busy ? "Procesando..." : "Cargar lista de elegibles"}
             </button>
           </div>
         </form>
