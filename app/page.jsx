@@ -48,7 +48,7 @@ export default function Home() {
                    placeholder="GBC-26G-0001" autoFocus />
             <button className="btn" type="submit">Verify certificate</button>
           </form>
-          {error && <div style={{ color: "#b3261e", marginTop: 10, fontSize: 14 }}>{error}</div>}
+          {error && <div style={{ color: "var(--red)", marginTop: 10, fontSize: 14 }}>{error}</div>}
           <div className="muted" style={{ marginTop: 10 }}>
             Numbers look like{" "}
             <a style={{ fontWeight: 600, cursor: "pointer" }}
