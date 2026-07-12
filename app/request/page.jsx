@@ -1,16 +1,22 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { t, LANG_COOKIE, DEFAULT_LANG } from "../../lib/i18n.jsx";
+import LangToggle from "../LangToggle.jsx";
 
 // Debe coincidir con MAX_NAME_LENGTH en lib/certificateRequests.js (no se importa acá
 // porque ese módulo trae dependencias de servidor que no deben llegar al bundle del cliente).
 const MAX_NAME_LENGTH = 45;
 
-function TopBar() {
+function TopBar({ lang }) {
+  const s = t(lang);
   return (
     <div className="topbar"><div className="wrap">
       <a className="logo" href="/" style={{ textDecoration: "none" }}>G</a>
-      <span style={{ fontWeight: 500 }}>GovBidder Certificate Verification</span>
-      <nav className="nav"><a href="/">Verify a certificate</a></nav>
+      <span style={{ fontWeight: 500 }}>{s.brand}</span>
+      <nav className="nav">
+        <a href="/">{s.verifyAnother}</a>
+        <LangToggle lang={lang} />
+      </nav>
     </div></div>
   );
 }
@@ -20,7 +26,15 @@ export default function RequestCertificate() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
+  const [lang, setLang] = useState(DEFAULT_LANG);
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+
+  useEffect(() => {
+    const match = document.cookie.match(new RegExp(`${LANG_COOKIE}=(en|es)`));
+    if (match) setLang(match[1]);
+  }, []);
+
+  const s = t(lang);
 
   async function submit(e) {
     e.preventDefault();
@@ -32,7 +46,7 @@ export default function RequestCertificate() {
         body: JSON.stringify(form),
       });
       const j = await res.json();
-      if (!res.ok) { setError(j.error || "No se pudo enviar la solicitud."); }
+      if (!res.ok) { setError(j.error || s.charLimitError(MAX_NAME_LENGTH)); }
       else { setResult(j); }
     } catch (err) { setError(err.message); }
     setBusy(false);
@@ -40,61 +54,55 @@ export default function RequestCertificate() {
 
   return (
     <main>
-      <TopBar />
+      <TopBar lang={lang} />
       <section className="hero"><div className="wrap">
-        <div className="eyebrow">Solicitud de certificado</div>
-        <h1>Pedí tu certificado GovBidder</h1>
-        <p>Completá tus datos. Si ya completaste el programa, tu certificado se genera y se
-        envía a tu email automáticamente. Si no podemos confirmarlo al instante, nuestro equipo
-        lo revisa a mano y te avisamos por email.</p>
+        <div className="eyebrow">{s.requestEyebrow}</div>
+        <h1>{s.requestTitle}</h1>
+        <p>{s.requestIntro}</p>
 
         <div className="card">
           {result ? (
             <div>
               {result.status === "approved" ? (
                 <>
-                  <h2 style={{ color: "var(--navy)", margin: "0 0 8px" }}>¡Listo!</h2>
-                  <p>Tu certificado <b>{result.certificate_number}</b> ya está activo.{" "}
-                  {result.email_sent
-                    ? "Te enviamos el enlace por email."
-                    : "No pudimos enviarte el email, pero ya podés verificarlo con este número."}</p>
+                  <h2 style={{ color: "var(--navy)", margin: "0 0 8px" }}>{s.approvedTitle}</h2>
+                  <p>{s.approvedBody(result.certificate_number, result.email_sent)}</p>
                 </>
               ) : (
                 <>
-                  <h2 style={{ color: "var(--navy)", margin: "0 0 8px" }}>Recibimos tu solicitud</h2>
-                  <p>No pudimos confirmarlo automáticamente. Nuestro equipo lo va a revisar y te
-                  avisamos por email apenas quede listo.</p>
+                  <h2 style={{ color: "var(--navy)", margin: "0 0 8px" }}>{s.pendingTitle}</h2>
+                  <p>{s.pendingBody}</p>
                 </>
               )}
             </div>
           ) : (
             <form onSubmit={submit}>
               <div className="form-grid">
-                <label>Nombre
+                <label>{s.firstName}
                   <input value={form.first_name} onChange={set("first_name")} required />
                 </label>
-                <label>Apellido *
+                <label>{s.lastName}
                   <input value={form.last_name} onChange={set("last_name")} required />
                 </label>
-                <label className="full">Email
+                <label className="full">{s.email}
                   <input type="email" value={form.email} onChange={set("email")} required />
                 </label>
                 <label className="full">
-                  Cómo querés que aparezca tu nombre en el certificado
+                  {s.displayNameLabel}
                   <input
                     value={form.full_name}
                     onChange={set("full_name")}
                     maxLength={MAX_NAME_LENGTH}
-                    placeholder="Ej: Juan Pérez"
+                    placeholder={s.displayNamePlaceholder}
                     required
                   />
-                  <span className="muted">{form.full_name.length}/{MAX_NAME_LENGTH} caracteres</span>
+                  <span className="muted">{s.charCount(form.full_name.length, MAX_NAME_LENGTH)}</span>
                 </label>
               </div>
               {error && <div style={{ color: "var(--red)", marginTop: 10, fontSize: 14 }}>{error}</div>}
               <div style={{ marginTop: 16 }}>
                 <button className="btn" style={{ padding: "12px 22px" }} disabled={busy}>
-                  {busy ? "Enviando..." : "Solicitar certificado"}
+                  {busy ? s.sendingRequest : s.submitRequest}
                 </button>
               </div>
             </form>

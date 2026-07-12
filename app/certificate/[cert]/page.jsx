@@ -1,7 +1,10 @@
 // Página única de verificación. El número viene en la URL:
 //   /certificate/GBC-26G-0001
+import { cookies } from "next/headers";
 import { publicClient } from "../../../lib/supabase.js";
+import { t, LANG_COOKIE, DEFAULT_LANG } from "../../../lib/i18n.jsx";
 import SendEmailButton from "./SendEmailButton.jsx";
+import LangToggle from "../../LangToggle.jsx";
 
 export const dynamic = "force-dynamic";
 
@@ -10,96 +13,103 @@ function maskEmail(email) {
   return email.replace(/^(.{2}).*(@.*)$/, "$1***$2");
 }
 
-function fmtDate(d) {
+function fmtDate(d, lang) {
   if (!d) return "-";
   try {
-    return new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+    return new Date(d).toLocaleDateString(lang === "es" ? "es-ES" : "en-US", { year: "numeric", month: "long", day: "numeric" });
   } catch { return String(d); }
 }
 
-const STATUS = {
-  active:  { cls: "status-valid",   title: "VALID",    sub: "This certificate is active and in good standing." },
-  revoked: { cls: "status-bad",     title: "REVOKED",  sub: "This certificate was revoked and is no longer valid." },
-  pending: { cls: "status-pending", title: "PENDING",  sub: "This certificate is pending confirmation." },
-};
-
-function TopBar() {
+function TopBar({ lang }) {
   return (
     <div className="topbar"><div className="wrap">
       <a className="logo" href="/" style={{ textDecoration: "none" }}>G</a>
-      <span style={{ fontWeight: 500 }}>GovBidder Certificate Verification</span>
-      <nav className="nav"><a href="/">Verify another</a></nav>
+      <span style={{ fontWeight: 500 }}>{t(lang).brand}</span>
+      <nav className="nav">
+        <a href="/">{t(lang).verifyAnother}</a>
+        <LangToggle lang={lang} />
+      </nav>
     </div></div>
   );
 }
 
-function Seal() {
+function Seal({ lang }) {
+  const year = new Date().getFullYear();
   return (
     <div className="seal">
       <div style={{ fontSize: 20 }}>★</div>
-      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".06em" }}>VERIFIED</div>
-      <div style={{ fontSize: 13, fontWeight: 700 }}>2026</div>
+      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".06em" }}>{t(lang).verified}</div>
+      <div style={{ fontSize: 13, fontWeight: 700 }}>{year}</div>
     </div>
   );
 }
 
 export default async function CertificatePage({ params }) {
   const number = decodeURIComponent(params.cert).toUpperCase();
+  const lang = cookies().get(LANG_COOKIE)?.value === "es" ? "es" : DEFAULT_LANG;
+  const s = t(lang);
+
+  const STATUS = {
+    active:  { cls: "status-valid",   title: s.statusValid,     sub: s.statusValidSub,     check: true },
+    revoked: { cls: "status-bad",     title: s.statusRevoked,   sub: s.statusRevokedSub },
+    pending: { cls: "status-pending", title: s.statusPending,   sub: s.statusPendingSub },
+  };
+
   const supabase = publicClient();
   const { data: cert } = await supabase
     .from("certificates").select("*").eq("certificate_number", number).single();
 
   return (
     <>
-      <TopBar />
+      <TopBar lang={lang} />
       <section className="hero"><div className="wrap">
-        <div className="eyebrow">Official verification portal</div>
-        <h1 style={{ fontSize: 28 }}>Verification result</h1>
+        <div className="eyebrow">{s.officialPortal}</div>
+        <h1 style={{ fontSize: 28 }}>{s.verificationResult}</h1>
       </div></section>
 
       <div className="result">
         {!cert ? (
           <div className="panel">
-            <div className="status-nf"><h2>NOT FOUND</h2>
-              <div className="muted">No record matches this number.</div></div>
+            <div className="status-nf"><h2>{s.statusNotFound}</h2>
+              <div className="muted">{s.statusNotFoundSub}</div></div>
             <div className="body"><div className="fields">
-              <p>No certificate with the number <b>{number}</b> was found in the registry.</p>
-              <p className="muted">Check the number for typing mistakes. Numbers look like GBC-26G-0001.
-              If you keep seeing this for a certificate you believe is genuine, email team@govbidder.net.</p>
-              <p><a href="/">← Try another number</a></p>
+              <p>{s.notFoundBody(number)}</p>
+              <p className="muted">{s.notFoundHint}</p>
+              <p><a href="/">{s.tryAnother}</a></p>
             </div></div>
           </div>
         ) : (() => {
-          const s = STATUS[cert.status] || STATUS.active;
+          const st = STATUS[cert.status] || STATUS.active;
           return (
             <div className="panel">
-              <div className={s.cls}><h2>{s.title}</h2><div className="muted">{s.sub}</div></div>
+              <div className={st.cls}>
+                <h2>{st.check && <span className="check">✓</span>}{st.title}</h2>
+                <div className="muted">{st.sub}</div>
+              </div>
               <div className="body">
                 <div className="fields">
-                  <div className="label">Awarded to</div>
+                  <div className="label">{s.awardedTo}</div>
                   <div className="name">{cert.full_name || `${cert.first_name || ""} ${cert.last_name || ""}`.trim()}</div>
                   <div className="grid">
-                    <div className="field"><div className="label">Program</div><div className="val">{cert.program || "-"}</div></div>
-                    <div className="field"><div className="label">Certificate type</div><div className="val">{cert.certificate_type || "-"}</div></div>
-                    <div className="field"><div className="label">Completed on</div><div className="val">{fmtDate(cert.issue_date)}</div></div>
-                    <div className="field"><div className="label">Hours completed</div><div className="val">{cert.hours ? `${cert.hours} hours` : "-"}</div></div>
-                    <div className="field"><div className="label">Issued by</div><div className="val">{cert.issued_by || "-"}</div></div>
-                    <div className="field"><div className="label">Signed by</div><div className="val">{cert.signed_by || "-"}</div></div>
+                    <div className="field"><div className="label">{s.program}</div><div className="val">{cert.program || "-"}</div></div>
+                    <div className="field"><div className="label">{s.certificateType}</div><div className="val">{cert.certificate_type || "-"}</div></div>
+                    <div className="field"><div className="label">{s.completedOn}</div><div className="val">{fmtDate(cert.issue_date, lang)}</div></div>
+                    <div className="field"><div className="label">{s.hoursCompleted}</div><div className="val">{cert.hours ? `${cert.hours} ${s.hoursSuffix}` : "-"}</div></div>
+                    <div className="field"><div className="label">{s.issuedBy}</div><div className="val">{cert.issued_by || "-"}</div></div>
+                    <div className="field"><div className="label">{s.signedBy}</div><div className="val">{cert.signed_by || "-"}</div></div>
                   </div>
                   <div style={{ marginTop: 20 }}>
                     {cert.email ? (
-                      <SendEmailButton certificateNumber={cert.certificate_number} maskedEmail={maskEmail(cert.email)} />
+                      <SendEmailButton certificateNumber={cert.certificate_number} maskedEmail={maskEmail(cert.email)} lang={lang} />
                     ) : (
-                      <p className="muted">
-                        This certificate has no email on file. Email team@govbidder.net for help.
-                      </p>
+                      <p className="muted">{s.noEmailOnFile}</p>
                     )}
                   </div>
                 </div>
                 <div style={{ textAlign: "center" }}>
-                  <Seal />
+                  <Seal lang={lang} />
                   <div className="certno">
-                    <div className="label">Certificate no.</div>
+                    <div className="label">{s.certificateNo}</div>
                     <div style={{ fontWeight: 700, color: "var(--navy)" }}>{cert.certificate_number}</div>
                   </div>
                 </div>
