@@ -1,8 +1,14 @@
 // Página única de verificación. El número viene en la URL:
 //   /certificate/GBC-26G-0001
 import { publicClient } from "../../../lib/supabase.js";
+import SendEmailButton from "./SendEmailButton.jsx";
 
 export const dynamic = "force-dynamic";
+
+function maskEmail(email) {
+  if (!email) return null;
+  return email.replace(/^(.{2}).*(@.*)$/, "$1***$2");
+}
 
 function fmtDate(d) {
   if (!d) return "-";
@@ -80,9 +86,15 @@ export default async function CertificatePage({ params }) {
                     <div className="field"><div className="label">Issued by</div><div className="val">{cert.issued_by || "-"}</div></div>
                     <div className="field"><div className="label">Signed by</div><div className="val">{cert.signed_by || "-"}</div></div>
                   </div>
-                  <p style={{ marginTop: 20 }}>
-                    <a className="btn" href={`/api/certificates/${encodeURIComponent(number)}/pdf`}>Download PDF</a>
-                  </p>
+                  <div style={{ marginTop: 20 }}>
+                    {cert.email ? (
+                      <SendEmailButton certificateNumber={cert.certificate_number} maskedEmail={maskEmail(cert.email)} />
+                    ) : (
+                      <p className="muted">
+                        This certificate has no email on file. Email team@govbidder.net for help.
+                      </p>
+                    )}
+                  </div>
                 </div>
                 <div style={{ textAlign: "center" }}>
                   <Seal />

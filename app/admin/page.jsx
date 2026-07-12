@@ -1,5 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+const TOKEN_KEY = "gb_admin_token";
 
 export default function Admin() {
   const [token, setToken] = useState("");
@@ -7,6 +9,17 @@ export default function Admin() {
   const [out, setOut] = useState("");
   const [busy, setBusy] = useState(false);
   const [requests, setRequests] = useState(null);
+
+  // Recordar el token entre recargas: se pega una vez y queda "logueado"
+  // en ese navegador hasta que se borre manualmente.
+  useEffect(() => {
+    const saved = localStorage.getItem(TOKEN_KEY);
+    if (saved) setToken(saved);
+  }, []);
+  useEffect(() => {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+  }, [token]);
 
   const [form, setForm] = useState({
     first_name: "", last_name: "", email: "",
@@ -136,6 +149,14 @@ export default function Admin() {
         <input type="password" value={token} onChange={(e) => setToken(e.target.value)}
                placeholder="ADMIN_TOKEN" style={{ width: "100%", padding: 10, marginTop: 4 }} />
       </label>
+      {token && (
+        <button
+          onClick={() => setToken("")}
+          style={{ background: "none", border: "none", color: "var(--grey)", textDecoration: "underline", cursor: "pointer", padding: 0, marginTop: 8, fontSize: 13 }}
+        >
+          Cerrar sesión
+        </button>
+      )}
 
       <div className="tabs">
         <div className={`tab ${tab === "single" ? "active" : ""}`} onClick={() => setTab("single")}>Alta individual</div>
