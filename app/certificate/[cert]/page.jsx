@@ -33,14 +33,11 @@ function TopBar({ lang }) {
   );
 }
 
-function Seal({ lang }) {
-  const year = new Date().getFullYear();
+function Seal() {
+  // Sin año en la imagen (se sacó a propósito): el mismo archivo sirve para
+  // siempre, no hay que regenerarlo cada 1 de enero.
   return (
-    <div className="seal">
-      <div style={{ fontSize: 20 }}>★</div>
-      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".06em" }}>{t(lang).verified}</div>
-      <div style={{ fontSize: 13, fontWeight: 700 }}>{year}</div>
-    </div>
+    <img src="/verified.png" alt="GovBidder Verified" width={130} height={130} style={{ width: 130, height: 130 }} />
   );
 }
 
@@ -107,7 +104,7 @@ export default async function CertificatePage({ params }) {
                   </div>
                 </div>
                 <div style={{ textAlign: "center" }}>
-                  <Seal lang={lang} />
+                  <Seal />
                   <div className="certno">
                     <div className="label">{s.certificateNo}</div>
                     <div style={{ fontWeight: 700, color: "var(--navy)" }}>{cert.certificate_number}</div>
