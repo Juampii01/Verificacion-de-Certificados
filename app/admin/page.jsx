@@ -5,21 +5,58 @@ const TOKEN_KEY = "gb_admin_token";
 
 export default function Admin() {
   const [token, setToken] = useState("");
+  // null = todavía comprobando el token guardado; true/false = resultado.
+  const [authed, setAuthed] = useState(null);
+  const [loginInput, setLoginInput] = useState("");
+  const [loginBusy, setLoginBusy] = useState(false);
+  const [loginError, setLoginError] = useState("");
+
   const [tab, setTab] = useState("single");
   const [out, setOut] = useState("");
   const [busy, setBusy] = useState(false);
   const [requests, setRequests] = useState(null);
+  const [pdfNumber, setPdfNumber] = useState("");
 
-  // Recordar el token entre recargas: se pega una vez y queda "logueado"
-  // en ese navegador hasta que se borre manualmente.
+  // Valida un token contra el servidor (usa un endpoint admin liviano) antes
+  // de mostrar el panel. Sin esto, cualquiera vería la interfaz aunque no
+  // pudiera hacer nada con ella.
+  async function verifyToken(candidate) {
+    try {
+      const res = await fetch("/api/certificate-requests", { headers: { "x-admin-token": candidate } });
+      return res.status !== 401;
+    } catch {
+      return false;
+    }
+  }
+
+  // Al cargar: si hay un token guardado, lo valida antes de mostrar el panel.
   useEffect(() => {
     const saved = localStorage.getItem(TOKEN_KEY);
-    if (saved) setToken(saved);
+    if (!saved) { setAuthed(false); return; }
+    verifyToken(saved).then((ok) => {
+      if (ok) { setToken(saved); setAuthed(true); }
+      else { localStorage.removeItem(TOKEN_KEY); setAuthed(false); }
+    });
   }, []);
-  useEffect(() => {
-    if (token) localStorage.setItem(TOKEN_KEY, token);
-    else localStorage.removeItem(TOKEN_KEY);
-  }, [token]);
+
+  async function login(e) {
+    e.preventDefault();
+    setLoginBusy(true); setLoginError("");
+    const ok = await verifyToken(loginInput);
+    if (ok) {
+      localStorage.setItem(TOKEN_KEY, loginInput);
+      setToken(loginInput);
+      setAuthed(true);
+    } else {
+      setLoginError("Contraseña incorrecta.");
+    }
+    setLoginBusy(false);
+  }
+
+  function logout() {
+    localStorage.removeItem(TOKEN_KEY);
+    setToken(""); setLoginInput(""); setAuthed(false);
+  }
 
   const [form, setForm] = useState({
     first_name: "", last_name: "", email: "",
@@ -46,7 +83,6 @@ export default function Admin() {
           `✓ Certificado creado\n` +
           `Número:  ${c.certificate_number}\n` +
           `Verify:  /certificate/${c.certificate_number}\n` +
-          `PDF:     /api/certificates/${c.certificate_number}/pdf\n` +
           `QR:      /api/certificates/${c.certificate_number}/qr`
         );
       }
@@ -140,23 +176,57 @@ export default function Admin() {
     setBusy(false);
   }
 
+  async function downloadPdf(e) {
+    e.preventDefault();
+    const number = pdfNumber.trim().toUpperCase();
+    if (!number) return;
+    setBusy(true); setOut("");
+    try {
+      const res = await fetch(`/api/certificates/${encodeURIComponent(number)}/pdf`, {
+        headers: { "x-admin-token": token },
+      });
+      if (!res.ok) { setOut(res.status === 404 ? "ERROR: certificado no encontrado." : "ERROR: " + (await res.text())); setBusy(false); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `${number}.pdf`; a.click();
+      URL.revokeObjectURL(url);
+      setOut(`✓ PDF de ${number} descargado.`);
+    } catch (err) { setOut("ERROR: " + err.message); }
+    setBusy(false);
+  }
+
+  if (authed !== true) {
+    return (
+      <main className="admin">
+        <h1>Panel administrativo · Certificados</h1>
+        <form onSubmit={login} style={{ maxWidth: 360, marginTop: 20 }}>
+          <label style={{ display: "block" }}>
+            <div className="label">Contraseña admin</div>
+            <input
+              type="password" value={loginInput} autoFocus
+              onChange={(e) => { setLoginInput(e.target.value); setLoginError(""); }}
+              placeholder="ADMIN_TOKEN" style={{ width: "100%", padding: 10, marginTop: 4 }}
+            />
+          </label>
+          {loginError && <div style={{ color: "var(--red)", marginTop: 8, fontSize: 14 }}>{loginError}</div>}
+          <button className="btn" style={{ marginTop: 14, padding: "12px 22px" }} disabled={loginBusy || authed === null}>
+            {authed === null ? "Verificando..." : loginBusy ? "Ingresando..." : "Ingresar"}
+          </button>
+        </form>
+      </main>
+    );
+  }
+
   return (
     <main className="admin">
       <h1>Panel administrativo · Certificados</h1>
-
-      <label style={{ display: "block", maxWidth: 360 }}>
-        <div className="label">Contraseña admin</div>
-        <input type="password" value={token} onChange={(e) => setToken(e.target.value)}
-               placeholder="ADMIN_TOKEN" style={{ width: "100%", padding: 10, marginTop: 4 }} />
-      </label>
-      {token && (
-        <button
-          onClick={() => setToken("")}
-          style={{ background: "none", border: "none", color: "var(--grey)", textDecoration: "underline", cursor: "pointer", padding: 0, marginTop: 8, fontSize: 13 }}
-        >
-          Cerrar sesión
-        </button>
-      )}
+      <button
+        onClick={logout}
+        style={{ background: "none", border: "none", color: "var(--grey)", textDecoration: "underline", cursor: "pointer", padding: 0, marginBottom: 20, fontSize: 13 }}
+      >
+        Cerrar sesión
+      </button>
 
       <div className="tabs">
         <div className={`tab ${tab === "single" ? "active" : ""}`} onClick={() => setTab("single")}>Alta individual</div>
@@ -164,6 +234,7 @@ export default function Admin() {
         <div className={`tab ${tab === "requests" ? "active" : ""}`}
              onClick={() => { setTab("requests"); loadRequests(); }}>Solicitudes pendientes</div>
         <div className={`tab ${tab === "eligible" ? "active" : ""}`} onClick={() => setTab("eligible")}>Lista de elegibles (día 4)</div>
+        <div className={`tab ${tab === "pdf" ? "active" : ""}`} onClick={() => setTab("pdf")}>Descargar PDF</div>
         <div className="tab" onClick={exportCanva} title="Descarga el CSV con datos + URL del QR para Canva Bulk Create">⬇ CSV para Canva</div>
       </div>
 
@@ -250,6 +321,25 @@ export default function Admin() {
           <div style={{ marginTop: 14 }}>
             <button className="btn" style={{ padding: "12px 22px" }} disabled={busy}>
               {busy ? "Procesando..." : "Cargar lista de elegibles"}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {tab === "pdf" && (
+        <form onSubmit={downloadPdf}>
+          <p className="muted">
+            Descargá el PDF de cualquier certificado directo desde acá (por ejemplo, si alguien
+            todavía no puede recibirlo por email). El público no tiene acceso a esta descarga.
+          </p>
+          <label style={{ display: "block", maxWidth: 320 }}>
+            Número de certificado
+            <input value={pdfNumber} onChange={(e) => setPdfNumber(e.target.value)}
+                   placeholder="GBC-26X-0001" style={{ width: "100%", padding: 10, marginTop: 4 }} />
+          </label>
+          <div style={{ marginTop: 14 }}>
+            <button className="btn" style={{ padding: "12px 22px" }} disabled={busy}>
+              {busy ? "Descargando..." : "Descargar PDF"}
             </button>
           </div>
         </form>
