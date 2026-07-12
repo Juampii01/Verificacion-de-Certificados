@@ -3,6 +3,15 @@ import { useState, useEffect } from "react";
 
 const TOKEN_KEY = "gb_admin_token";
 
+// Debe coincidir con certificateFilename() en lib/pdf.js (no se importa acá porque
+// ese módulo trae pdf-lib/fs, dependencias de servidor que no deben llegar al cliente).
+function certificateFilename(cert) {
+  const clean = (s) => String(s || "").replace(/[\\/:*?"<>|]+/g, "").trim();
+  const name = clean(cert.full_name || `${cert.first_name || ""} ${cert.last_name || ""}`.trim()) || cert.certificate_number;
+  const program = clean(cert.program || "GovBidder Challenge");
+  return `${name} - ${program} - Certificado.pdf`;
+}
+
 export default function Admin() {
   const [token, setToken] = useState("");
   // null = todavía comprobando el token guardado; true/false = resultado.
@@ -15,7 +24,9 @@ export default function Admin() {
   const [out, setOut] = useState("");
   const [busy, setBusy] = useState(false);
   const [requests, setRequests] = useState(null);
-  const [pdfNumber, setPdfNumber] = useState("");
+  const [certs, setCerts] = useState(null);
+  const [certsLoading, setCertsLoading] = useState(false);
+  const [rowBusy, setRowBusy] = useState({});
 
   // Valida un token contra el servidor (usa un endpoint admin liviano) antes
   // de mostrar el panel. Sin esto, cualquiera vería la interfaz aunque no
@@ -176,24 +187,47 @@ export default function Admin() {
     setBusy(false);
   }
 
-  async function downloadPdf(e) {
-    e.preventDefault();
-    const number = pdfNumber.trim().toUpperCase();
-    if (!number) return;
-    setBusy(true); setOut("");
+  async function loadCerts() {
+    setCertsLoading(true); setOut("");
     try {
-      const res = await fetch(`/api/certificates/${encodeURIComponent(number)}/pdf`, {
+      const res = await fetch("/api/certificates", { headers: { "x-admin-token": token } });
+      const j = await res.json();
+      if (!res.ok) { setOut("ERROR: " + JSON.stringify(j, null, 2)); }
+      else { setCerts(j.certificates); }
+    } catch (err) { setOut("ERROR: " + err.message); }
+    setCertsLoading(false);
+  }
+
+  async function sendCertEmail(cert) {
+    setRowBusy((b) => ({ ...b, [cert.certificate_number]: "email" })); setOut("");
+    try {
+      const res = await fetch(`/api/certificates/${encodeURIComponent(cert.certificate_number)}/send-email`, { method: "POST" });
+      const j = await res.json();
+      if (!res.ok) setOut(`ERROR (${cert.certificate_number}): ` + (j.error || "no se pudo enviar"));
+      else setOut(`✓ Email enviado a ${j.email} (${cert.certificate_number}).`);
+    } catch (err) { setOut("ERROR: " + err.message); }
+    setRowBusy((b) => ({ ...b, [cert.certificate_number]: null }));
+  }
+
+  async function downloadCertPdf(cert) {
+    setRowBusy((b) => ({ ...b, [cert.certificate_number]: "pdf" })); setOut("");
+    try {
+      const res = await fetch(`/api/certificates/${encodeURIComponent(cert.certificate_number)}/pdf`, {
         headers: { "x-admin-token": token },
       });
-      if (!res.ok) { setOut(res.status === 404 ? "ERROR: certificado no encontrado." : "ERROR: " + (await res.text())); setBusy(false); return; }
+      if (!res.ok) {
+        setOut("ERROR: " + (res.status === 404 ? "certificado no encontrado" : await res.text()));
+        setRowBusy((b) => ({ ...b, [cert.certificate_number]: null }));
+        return;
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url; a.download = `${number}.pdf`; a.click();
+      a.href = url; a.download = certificateFilename(cert); a.click();
       URL.revokeObjectURL(url);
-      setOut(`✓ PDF de ${number} descargado.`);
+      setOut(`✓ PDF de ${cert.full_name || cert.certificate_number} descargado.`);
     } catch (err) { setOut("ERROR: " + err.message); }
-    setBusy(false);
+    setRowBusy((b) => ({ ...b, [cert.certificate_number]: null }));
   }
 
   if (authed !== true) {
@@ -234,7 +268,8 @@ export default function Admin() {
         <div className={`tab ${tab === "requests" ? "active" : ""}`}
              onClick={() => { setTab("requests"); loadRequests(); }}>Solicitudes pendientes</div>
         <div className={`tab ${tab === "eligible" ? "active" : ""}`} onClick={() => setTab("eligible")}>Lista de elegibles (día 4)</div>
-        <div className={`tab ${tab === "pdf" ? "active" : ""}`} onClick={() => setTab("pdf")}>Descargar PDF</div>
+        <div className={`tab ${tab === "list" ? "active" : ""}`}
+             onClick={() => { setTab("list"); loadCerts(); }}>Todos los certificados</div>
         <div className="tab" onClick={exportCanva} title="Descarga el CSV con datos + URL del QR para Canva Bulk Create">⬇ CSV para Canva</div>
       </div>
 
@@ -326,23 +361,62 @@ export default function Admin() {
         </form>
       )}
 
-      {tab === "pdf" && (
-        <form onSubmit={downloadPdf}>
+      {tab === "list" && (
+        <div>
           <p className="muted">
-            Descargá el PDF de cualquier certificado directo desde acá (por ejemplo, si alguien
-            todavía no puede recibirlo por email). El público no tiene acceso a esta descarga.
+            Todos los certificados creados. Enviá el email al registrado, o descargá el PDF
+            directo (el archivo se guarda con el nombre y apellido de la persona, no el número).
           </p>
-          <label style={{ display: "block", maxWidth: 320 }}>
-            Número de certificado
-            <input value={pdfNumber} onChange={(e) => setPdfNumber(e.target.value)}
-                   placeholder="GBC-26X-0001" style={{ width: "100%", padding: 10, marginTop: 4 }} />
-          </label>
-          <div style={{ marginTop: 14 }}>
-            <button className="btn" style={{ padding: "12px 22px" }} disabled={busy}>
-              {busy ? "Descargando..." : "Descargar PDF"}
-            </button>
-          </div>
-        </form>
+          <button className="btn" style={{ padding: "8px 16px", marginBottom: 14 }} onClick={loadCerts} disabled={certsLoading}>
+            {certsLoading ? "Cargando..." : "↻ Actualizar lista"}
+          </button>
+          {certs && certs.length === 0 && <p className="muted">No hay certificados todavía.</p>}
+          {certs && certs.length > 0 && (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                <thead>
+                  <tr style={{ textAlign: "left", borderBottom: "2px solid #eee" }}>
+                    <th style={{ padding: "8px 6px" }}>Número</th>
+                    <th style={{ padding: "8px 6px" }}>Nombre</th>
+                    <th style={{ padding: "8px 6px" }}>Email</th>
+                    <th style={{ padding: "8px 6px" }}>Estado</th>
+                    <th style={{ padding: "8px 6px" }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {certs.map((c) => {
+                    const rb = rowBusy[c.certificate_number];
+                    return (
+                      <tr key={c.certificate_number} style={{ borderBottom: "1px solid #f2f2f2" }}>
+                        <td style={{ padding: "8px 6px", fontWeight: 600, color: "var(--navy)", whiteSpace: "nowrap" }}>{c.certificate_number}</td>
+                        <td style={{ padding: "8px 6px" }}>{c.full_name || `${c.first_name || ""} ${c.last_name || ""}`.trim()}</td>
+                        <td style={{ padding: "8px 6px" }}>{c.email || <span className="muted">sin email</span>}</td>
+                        <td style={{ padding: "8px 6px" }}>{c.status}</td>
+                        <td style={{ padding: "8px 6px", whiteSpace: "nowrap" }}>
+                          <button
+                            className="btn" style={{ padding: "6px 10px", fontSize: 13, marginRight: 6 }}
+                            disabled={!c.email || !!rb}
+                            title={!c.email ? "Este certificado no tiene email registrado" : ""}
+                            onClick={() => sendCertEmail(c)}
+                          >
+                            {rb === "email" ? "Enviando..." : "Enviar email"}
+                          </button>
+                          <button
+                            className="btn" style={{ padding: "6px 10px", fontSize: 13 }}
+                            disabled={!!rb}
+                            onClick={() => downloadCertPdf(c)}
+                          >
+                            {rb === "pdf" ? "Descargando..." : "Descargar PDF"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       )}
 
       {out && <div className="out">{out}</div>}

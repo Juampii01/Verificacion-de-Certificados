@@ -4,7 +4,7 @@
 // acá dejaría que cualquiera con un número ajeno se baje el PDF de otra persona.
 // El público recibe el PDF por email en la dirección registrada (ver send-email/route.js).
 import { publicClient } from "../../../../../lib/supabase.js";
-import { certificatePdf } from "../../../../../lib/pdf.js";
+import { certificatePdf, certificateFilename } from "../../../../../lib/pdf.js";
 import { checkAdmin } from "../../../../../lib/auth.js";
 
 export const runtime = "nodejs";
@@ -26,10 +26,11 @@ export async function GET(request, { params }) {
   }
 
   const bytes = await certificatePdf(data);
+  const filename = certificateFilename(data);
   return new Response(bytes, {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${number}.pdf"`,
+      "Content-Disposition": `attachment; filename="${number}.pdf"; filename*=UTF-8''${encodeURIComponent(filename)}`,
     },
   });
 }
