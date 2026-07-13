@@ -27,6 +27,10 @@ export default function Admin() {
   const [certs, setCerts] = useState(null);
   const [certsLoading, setCertsLoading] = useState(false);
   const [rowBusy, setRowBusy] = useState({});
+  const [syncData, setSyncData] = useState(null);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncChecked, setSyncChecked] = useState({});
+  const [syncApplying, setSyncApplying] = useState(false);
 
   // Valida un token contra el servidor (usa un endpoint admin liviano) antes
   // de mostrar el panel. Sin esto, cualquiera vería la interfaz aunque no
@@ -230,6 +234,45 @@ export default function Admin() {
     setRowBusy((b) => ({ ...b, [cert.certificate_number]: null }));
   }
 
+  async function loadSyncMatches() {
+    setSyncLoading(true); setOut("");
+    try {
+      const res = await fetch("/api/certificates/sync-emails", { headers: { "x-admin-token": token } });
+      const j = await res.json();
+      if (!res.ok) { setOut("ERROR: " + JSON.stringify(j, null, 2)); }
+      else {
+        setSyncData(j);
+        const checked = {};
+        j.matches.forEach((m) => { checked[m.certificate_number] = true; });
+        setSyncChecked(checked);
+      }
+    } catch (err) { setOut("ERROR: " + err.message); }
+    setSyncLoading(false);
+  }
+
+  async function applySync() {
+    const pairs = syncData.matches
+      .filter((m) => syncChecked[m.certificate_number])
+      .map((m) => ({ certificate_number: m.certificate_number, email: m.matched_email }));
+    if (!pairs.length) { setOut("No hay nada seleccionado para aplicar."); return; }
+    setSyncApplying(true); setOut("");
+    try {
+      const res = await fetch("/api/certificates/sync-emails", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-token": token },
+        body: JSON.stringify({ pairs }),
+      });
+      const j = await res.json();
+      if (!res.ok) { setOut("ERROR: " + JSON.stringify(j, null, 2)); }
+      else {
+        const errNote = j.errors && j.errors.length ? `\nErrores:\n${JSON.stringify(j.errors, null, 2)}` : "";
+        setOut(`✓ ${j.updated} certificado(s) actualizados con su email.` + errNote);
+        await loadSyncMatches();
+      }
+    } catch (err) { setOut("ERROR: " + err.message); }
+    setSyncApplying(false);
+  }
+
   if (authed !== true) {
     return (
       <main className="admin">
@@ -270,6 +313,8 @@ export default function Admin() {
         <div className={`tab ${tab === "eligible" ? "active" : ""}`} onClick={() => setTab("eligible")}>Lista de elegibles (día 4)</div>
         <div className={`tab ${tab === "list" ? "active" : ""}`}
              onClick={() => { setTab("list"); loadCerts(); }}>Todos los certificados</div>
+        <div className={`tab ${tab === "sync" ? "active" : ""}`}
+             onClick={() => { setTab("sync"); loadSyncMatches(); }}>Sincronizar emails</div>
         <div className="tab" onClick={exportCanva} title="Descarga el CSV con datos + URL del QR para Canva Bulk Create">⬇ CSV para Canva</div>
       </div>
 
@@ -414,6 +459,69 @@ export default function Admin() {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "sync" && (
+        <div>
+          <p className="muted">
+            Cruza los certificados sin email contra la lista de elegibles (día 4) por nombre.
+            Solo propone coincidencias por nombre exacto (sin tildes/mayúsculas/puntuación) —
+            revisá la lista antes de aplicar, porque esto escribe el email en el certificado.
+          </p>
+          <button className="btn" style={{ padding: "8px 16px", marginBottom: 14 }} onClick={loadSyncMatches} disabled={syncLoading}>
+            {syncLoading ? "Buscando..." : "↻ Buscar coincidencias"}
+          </button>
+          {syncData && syncData.matches.length === 0 && syncData.unmatched.length === 0 && (
+            <p className="muted">No hay certificados sin email. Nada que sincronizar.</p>
+          )}
+          {syncData && syncData.matches.length > 0 && (
+            <>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                  <thead>
+                    <tr style={{ textAlign: "left", borderBottom: "2px solid #eee" }}>
+                      <th style={{ padding: "8px 6px" }}></th>
+                      <th style={{ padding: "8px 6px" }}>Certificado</th>
+                      <th style={{ padding: "8px 6px" }}>Nombre en certificado</th>
+                      <th style={{ padding: "8px 6px" }}>Email encontrado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {syncData.matches.map((m) => (
+                      <tr key={m.certificate_number} style={{ borderBottom: "1px solid #f2f2f2" }}>
+                        <td style={{ padding: "8px 6px" }}>
+                          <input
+                            type="checkbox" checked={!!syncChecked[m.certificate_number]}
+                            onChange={(e) => setSyncChecked((s) => ({ ...s, [m.certificate_number]: e.target.checked }))}
+                          />
+                        </td>
+                        <td style={{ padding: "8px 6px", fontWeight: 600, color: "var(--navy)", whiteSpace: "nowrap" }}>{m.certificate_number}</td>
+                        <td style={{ padding: "8px 6px" }}>{m.cert_name}</td>
+                        <td style={{ padding: "8px 6px" }}>{m.matched_email}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <button className="btn" style={{ padding: "12px 22px", marginTop: 14 }} onClick={applySync} disabled={syncApplying}>
+                {syncApplying
+                  ? "Aplicando..."
+                  : `Aplicar a ${Object.values(syncChecked).filter(Boolean).length} certificado(s)`}
+              </button>
+            </>
+          )}
+          {syncData && syncData.unmatched.length > 0 && (
+            <div style={{ marginTop: 20 }}>
+              <div className="label" style={{ marginBottom: 6 }}>Sin coincidencia ({syncData.unmatched.length})</div>
+              <p className="muted">No se encontró a estas personas en la lista de elegibles (o el nombre no coincide exacto):</p>
+              <ul style={{ margin: 0, paddingLeft: 20 }}>
+                {syncData.unmatched.map((u) => (
+                  <li key={u.certificate_number} className="muted">{u.cert_name} — {u.certificate_number}</li>
+                ))}
+              </ul>
             </div>
           )}
         </div>
