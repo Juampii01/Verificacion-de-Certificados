@@ -16,7 +16,11 @@ function maskEmail(email) {
 function fmtDate(d, lang) {
   if (!d) return "-";
   try {
-    return new Date(d).toLocaleDateString(lang === "es" ? "es-ES" : "en-US", { year: "numeric", month: "long", day: "numeric" });
+    // issue_date es una fecha sin hora; usar componentes UTC evita que el huso
+    // horario del proceso la corra un día (mismo fix que en lib/pdf.js).
+    return new Date(d).toLocaleDateString(lang === "es" ? "es-ES" : "en-US", {
+      year: "numeric", month: "long", day: "numeric", timeZone: "UTC",
+    });
   } catch { return String(d); }
 }
 
@@ -61,7 +65,7 @@ export default async function CertificatePage({ params }) {
       <TopBar lang={lang} />
       <section className="hero"><div className="wrap">
         <div className="eyebrow">{s.officialPortal}</div>
-        <h1 style={{ fontSize: 28 }}>{s.verificationResult}</h1>
+        <h1>{s.verificationResult}</h1>
       </div></section>
 
       <div className="result">
@@ -87,6 +91,7 @@ export default async function CertificatePage({ params }) {
                 <div className="fields">
                   <div className="label">{s.awardedTo}</div>
                   <div className="name">{cert.full_name || `${cert.first_name || ""} ${cert.last_name || ""}`.trim()}</div>
+                  <div className="divider" />
                   <div className="grid">
                     <div className="field"><div className="label">{s.program}</div><div className="val">{cert.program || "-"}</div></div>
                     <div className="field"><div className="label">{s.certificateType}</div><div className="val">{cert.certificate_type || "-"}</div></div>
@@ -95,7 +100,7 @@ export default async function CertificatePage({ params }) {
                     <div className="field"><div className="label">{s.issuedBy}</div><div className="val">{cert.issued_by || "-"}</div></div>
                     <div className="field"><div className="label">{s.signedBy}</div><div className="val">{cert.signed_by || "-"}</div></div>
                   </div>
-                  <div style={{ marginTop: 20 }}>
+                  <div className="send-box">
                     {cert.email ? (
                       <SendEmailButton certificateNumber={cert.certificate_number} maskedEmail={maskEmail(cert.email)} lang={lang} />
                     ) : (
@@ -103,13 +108,13 @@ export default async function CertificatePage({ params }) {
                     )}
                   </div>
                 </div>
-                <div style={{ textAlign: "center" }}>
+                <aside className="sidebar">
                   <Seal />
                   <div className="certno">
                     <div className="label">{s.certificateNo}</div>
-                    <div style={{ fontWeight: 700, color: "var(--navy)" }}>{cert.certificate_number}</div>
+                    <div className="value">{cert.certificate_number}</div>
                   </div>
-                </div>
+                </aside>
               </div>
             </div>
           );
