@@ -234,8 +234,9 @@ export default function Admin() {
     setRowBusy((b) => ({ ...b, [cert.certificate_number]: null }));
   }
 
-  async function loadSyncMatches() {
-    setSyncLoading(true); setOut("");
+  async function loadSyncMatches(opts = {}) {
+    setSyncLoading(true);
+    if (!opts.keepOut) setOut("");
     try {
       const res = await fetch("/api/certificates/sync-emails", { headers: { "x-admin-token": token } });
       const j = await res.json();
@@ -267,7 +268,7 @@ export default function Admin() {
       else {
         const errNote = j.errors && j.errors.length ? `\nErrores:\n${JSON.stringify(j.errors, null, 2)}` : "";
         setOut(`✓ ${j.updated} certificado(s) actualizados con su email.` + errNote);
-        await loadSyncMatches();
+        await loadSyncMatches({ keepOut: true });
       }
     } catch (err) { setOut("ERROR: " + err.message); }
     setSyncApplying(false);
