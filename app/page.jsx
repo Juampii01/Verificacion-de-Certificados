@@ -9,7 +9,7 @@ function TopBar({ lang }) {
   const s = t(lang);
   return (
     <div className="topbar"><div className="wrap">
-      <span className="logo">G</span>
+      <img src="/logo.png" alt="GovBidder" className="logo" />
       <span style={{ fontWeight: 500 }}>{s.brand}</span>
       <nav className="nav">
         <a href="#verify">{s.nav.verify}</a>

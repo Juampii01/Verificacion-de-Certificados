@@ -23,7 +23,7 @@ function fmtDate(d, lang) {
 function TopBar({ lang }) {
   return (
     <div className="topbar"><div className="wrap">
-      <a className="logo" href="/" style={{ textDecoration: "none" }}>G</a>
+      <a href="/" style={{ textDecoration: "none" }}><img src="/logo.png" alt="GovBidder" className="logo" /></a>
       <span style={{ fontWeight: 500 }}>{t(lang).brand}</span>
       <nav className="nav">
         <a href="/">{t(lang).verifyAnother}</a>
