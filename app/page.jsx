@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { isValidCertNumber } from "../lib/certNumber.js";
 import { t, LANG_COOKIE, DEFAULT_LANG } from "../lib/i18n.jsx";
 import LangToggle from "./LangToggle.jsx";
+import GovBidderLink from "./GovBidderLink.jsx";
 
 function TopBar({ lang }) {
   const s = t(lang);
@@ -16,6 +17,7 @@ function TopBar({ lang }) {
         <a href="#how">{s.nav.how}</a>
         <a href="#security">{s.nav.security}</a>
         <a href="mailto:team@govbidder.net">{s.nav.support}</a>
+        <GovBidderLink />
         <LangToggle lang={lang} />
       </nav>
     </div></div>

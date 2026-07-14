@@ -11,8 +11,10 @@ a{color:var(--navy)}
 .topbar{background:var(--navy);color:#fff;padding:12px 0}
 .topbar .wrap{display:flex;align-items:center;gap:10px;font-size:14px}
 .logo{height:26px;width:auto;display:inline-block;background:#fff;border-radius:6px;padding:4px 8px}
-.nav{margin-left:auto;color:#9fb0cc;font-size:13px;display:flex;gap:18px}
+.nav{margin-left:auto;color:#9fb0cc;font-size:13px;display:flex;align-items:center;gap:18px}
 .nav a{color:#9fb0cc;text-decoration:none}
+.nav-external{display:inline-flex;align-items:center;gap:5px;color:#fff!important;font-weight:700;padding:6px 12px;border:1px solid rgba(255,255,255,.35);border-radius:999px;transition:background .15s ease,border-color .15s ease}
+.nav-external:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.6)}
 
 .hero{background:var(--navy);color:#fff;padding:44px 0 56px}
 .eyebrow{color:var(--red);font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin-bottom:8px}

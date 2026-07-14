@@ -5,6 +5,7 @@ import { publicClient } from "../../../lib/supabase.js";
 import { t, LANG_COOKIE, DEFAULT_LANG } from "../../../lib/i18n.jsx";
 import SendEmailButton from "./SendEmailButton.jsx";
 import LangToggle from "../../LangToggle.jsx";
+import GovBidderLink from "../../GovBidderLink.jsx";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,7 @@ function TopBar({ lang }) {
       <span style={{ fontWeight: 500 }}>{t(lang).brand}</span>
       <nav className="nav">
         <a href="/">{t(lang).verifyAnother}</a>
+        <GovBidderLink />
         <LangToggle lang={lang} />
       </nav>
     </div></div>

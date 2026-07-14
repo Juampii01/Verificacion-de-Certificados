@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { t, LANG_COOKIE, DEFAULT_LANG } from "../../lib/i18n.jsx";
 import LangToggle from "../LangToggle.jsx";
+import GovBidderLink from "../GovBidderLink.jsx";
 
 // Debe coincidir con MAX_NAME_LENGTH en lib/certificateRequests.js (no se importa acá
 // porque ese módulo trae dependencias de servidor que no deben llegar al bundle del cliente).
@@ -15,6 +16,7 @@ function TopBar({ lang }) {
       <span style={{ fontWeight: 500 }}>{s.brand}</span>
       <nav className="nav">
         <a href="/">{s.verifyAnother}</a>
+        <GovBidderLink />
         <LangToggle lang={lang} />
       </nav>
     </div></div>
