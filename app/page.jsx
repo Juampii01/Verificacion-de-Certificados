@@ -58,14 +58,14 @@ export default function Home() {
           <div className="label">{s.certNumberLabel}</div>
           <form className="searchbar" onSubmit={submit}>
             <input value={value} onChange={(e) => { setValue(e.target.value); setError(""); }}
-                   placeholder="GBC-26G-0001" autoFocus />
+                   placeholder="GBC-26G-0058" autoFocus />
             <button className="btn" type="submit">{s.verifyBtn}</button>
           </form>
           {error && <div style={{ color: "var(--red)", marginTop: 10, fontSize: 14 }}>{error}</div>}
           <div className="muted" style={{ marginTop: 10 }}>
             {s.exampleHint(
               <a style={{ fontWeight: 600, cursor: "pointer" }}
-                 onClick={() => setValue("GBC-26G-0001")}>GBC-26G-0001</a>
+                 onClick={() => router.push("/certificate/GBC-26G-0058")}>GBC-26G-0058</a>
             )}
           </div>
           <div className="muted" style={{ marginTop: 6 }}>
