@@ -92,3 +92,25 @@ a{color:var(--navy)}
 .form-grid input,.form-grid select{padding:10px;border:1px solid #d8dce2;border-radius:6px;font-size:14px}
 .full{grid-column:1 / -1}
 .out{background:var(--navy);color:#dce6ff;padding:16px;border-radius:8px;margin-top:18px;font-family:monospace;font-size:13px;white-space:pre-wrap}
+
+/* Celular: nada se sale de la pantalla */
+html,body{overflow-x:hidden}
+@media (max-width:760px){
+  .wrap{padding:0 16px}
+  .topbar .wrap{flex-wrap:wrap;row-gap:8px}
+  .topbar .wrap > span{font-size:13px;line-height:1.25}
+  .nav{gap:12px;flex-wrap:wrap;justify-content:flex-end}
+  .nav a:not(.nav-external){display:none}
+  .hero{padding:32px 0 40px}
+  .hero h1{font-size:28px;line-height:1.15}
+  .card{padding:18px}
+  .searchbar{flex-direction:column}
+  .searchbar input{width:100%;min-width:0;font-size:16px}
+  .btn{justify-content:center}
+  .steps{grid-template-columns:1fr}
+  .trust{grid-template-columns:1fr}
+  .result{padding:0 16px}
+  .fields{min-width:0}
+  .sidebar{flex-wrap:wrap}
+  .form-grid{grid-template-columns:1fr}
+}
