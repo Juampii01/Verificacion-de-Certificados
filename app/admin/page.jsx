@@ -5,6 +5,19 @@ const TOKEN_KEY = "gb_admin_token";
 
 // Debe coincidir con certificateFilename() en lib/pdf.js (no se importa acá porque
 // ese módulo trae pdf-lib/fs, dependencias de servidor que no deben llegar al cliente).
+// Ediciones del Challenge según la fecha de emisión del certificado.
+// Para sumar una edición nueva, agregar un elemento con su fecha de inicio.
+const EDITIONS = [
+  { key: "1", label: "1ra edición", from: "0000-01-01" },
+  { key: "2", label: "2da edición", from: "2026-11-01" },
+];
+function editionOf(cert) {
+  const d = String(cert.issue_date || "").slice(0, 10);
+  let key = EDITIONS[0].key;
+  for (const e of EDITIONS) if (d && d >= e.from) key = e.key;
+  return key;
+}
+
 function certificateFilename(cert) {
   const clean = (s) => String(s || "").replace(/[\\/:*?"<>|]+/g, "").trim();
   const name = clean(cert.full_name || `${cert.first_name || ""} ${cert.last_name || ""}`.trim()) || cert.certificate_number;
@@ -26,6 +39,7 @@ export default function Admin() {
   const [requests, setRequests] = useState(null);
   const [certs, setCerts] = useState(null);
   const [certsLoading, setCertsLoading] = useState(false);
+  const [edition, setEdition] = useState("2");
   const [rowBusy, setRowBusy] = useState({});
   const [syncData, setSyncData] = useState(null);
   const [syncLoading, setSyncLoading] = useState(false);
@@ -416,8 +430,30 @@ export default function Admin() {
           <button className="btn" style={{ padding: "8px 16px", marginBottom: 14 }} onClick={loadCerts} disabled={certsLoading}>
             {certsLoading ? "Cargando..." : "↻ Actualizar lista"}
           </button>
-          {certs && certs.length === 0 && <p className="muted">No hay certificados todavía.</p>}
           {certs && certs.length > 0 && (
+            <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+              {EDITIONS.map((e) => {
+                const n = certs.filter((c) => editionOf(c) === e.key).length;
+                const on = edition === e.key;
+                return (
+                  <button
+                    key={e.key}
+                    type="button"
+                    onClick={() => setEdition(e.key)}
+                    style={{
+                      padding: "8px 16px", borderRadius: 999, cursor: "pointer", fontWeight: 600, fontSize: 14,
+                      border: on ? "2px solid var(--navy)" : "1px solid #d5d9e0",
+                      background: on ? "var(--navy)" : "#fff", color: on ? "#fff" : "var(--navy)",
+                    }}
+                  >
+                    {e.label} ({n})
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {certs && certs.filter((c) => editionOf(c) === edition).length === 0 && <p className="muted">No hay certificados en esta edición.</p>}
+          {certs && certs.filter((c) => editionOf(c) === edition).length > 0 && (
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
                 <thead>
@@ -425,18 +461,20 @@ export default function Admin() {
                     <th style={{ padding: "8px 6px" }}>Número</th>
                     <th style={{ padding: "8px 6px" }}>Nombre</th>
                     <th style={{ padding: "8px 6px" }}>Email</th>
+                    <th style={{ padding: "8px 6px" }}>Emitido</th>
                     <th style={{ padding: "8px 6px" }}>Estado</th>
                     <th style={{ padding: "8px 6px" }}></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {certs.map((c) => {
+                  {certs.filter((c) => editionOf(c) === edition).map((c) => {
                     const rb = rowBusy[c.certificate_number];
                     return (
                       <tr key={c.certificate_number} style={{ borderBottom: "1px solid #f2f2f2" }}>
                         <td style={{ padding: "8px 6px", fontWeight: 600, color: "var(--navy)", whiteSpace: "nowrap" }}>{c.certificate_number}</td>
                         <td style={{ padding: "8px 6px" }}>{c.full_name || `${c.first_name || ""} ${c.last_name || ""}`.trim()}</td>
                         <td style={{ padding: "8px 6px" }}>{c.email || <span className="muted">sin email</span>}</td>
+                        <td style={{ padding: "8px 6px", whiteSpace: "nowrap" }}>{c.issue_date ? String(c.issue_date).slice(0, 10).split("-").reverse().join("/") : "—"}</td>
                         <td style={{ padding: "8px 6px" }}>{c.status}</td>
                         <td style={{ padding: "8px 6px", whiteSpace: "nowrap" }}>
                           <button
