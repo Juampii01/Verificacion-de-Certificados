@@ -4,7 +4,7 @@ import { qrPng } from "../../../../../lib/pdf.js";
 export const runtime = "nodejs";
 
 export async function GET(_request, { params }) {
-  const number = decodeURIComponent(params.cert).toUpperCase();
+  const number = decodeURIComponent((await params).cert).toUpperCase();
   const png = await qrPng(number, 600);
   return new Response(png, {
     headers: {

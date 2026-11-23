@@ -9,7 +9,7 @@ export async function POST(request, { params }) {
   if (!checkAdmin(request)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
-  const result = await rejectCertificateRequest(params.id);
+  const result = await rejectCertificateRequest((await params).id);
   if (result.error) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }

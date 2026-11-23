@@ -48,8 +48,9 @@ function Seal() {
 }
 
 export default async function CertificatePage({ params }) {
-  const number = decodeURIComponent(params.cert).toUpperCase();
-  const lang = cookies().get(LANG_COOKIE)?.value === "es" ? "es" : DEFAULT_LANG;
+  const { cert: certParam } = await params;
+  const number = decodeURIComponent(certParam).toUpperCase();
+  const lang = (await cookies()).get(LANG_COOKIE)?.value === "es" ? "es" : DEFAULT_LANG;
   const s = t(lang);
 
   const STATUS = {
