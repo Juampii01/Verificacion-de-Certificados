@@ -13,7 +13,7 @@ export async function GET(request, { params }) {
   if (!checkAdmin(request)) {
     return new Response("No autorizado", { status: 401 });
   }
-  const number = decodeURIComponent(params.cert).toUpperCase();
+  const number = decodeURIComponent((await params).cert).toUpperCase();
   const supabase = publicClient();
   const { data, error } = await supabase
     .from("certificates")

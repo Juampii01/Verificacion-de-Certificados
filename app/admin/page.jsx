@@ -351,7 +351,7 @@ export default function Admin() {
           <p className="muted">
             El archivo debe tener columnas: <b>Nombre, Apellido, Correo, Programa, Fecha de emisión, Número de certificado</b> (el número es opcional; si va vacío se genera solo).
           </p>
-          <input type="file" name="file" accept=".xlsx,.xls,.csv" />
+          <input type="file" name="file" accept=".xlsx,.csv" />
           <div style={{ marginTop: 14 }}>
             <button className="btn" style={{ padding: "12px 22px" }} disabled={busy}>
               {busy ? "Procesando..." : "Cargar y crear certificados"}
@@ -398,7 +398,7 @@ export default function Admin() {
             se aprueba y envía automáticamente. Se puede volver a subir para agregar más gente
             (no duplica, actualiza por email).
           </p>
-          <input type="file" name="file" accept=".xlsx,.xls,.csv" />
+          <input type="file" name="file" accept=".xlsx,.csv" />
           <div style={{ marginTop: 14 }}>
             <button className="btn" style={{ padding: "12px 22px" }} disabled={busy}>
               {busy ? "Procesando..." : "Cargar lista de elegibles"}

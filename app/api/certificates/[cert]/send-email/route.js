@@ -11,7 +11,7 @@ import { sendCertificatePdfEmail } from "../../../../../lib/email.js";
 export const runtime = "nodejs";
 
 export async function POST(_request, { params }) {
-  const number = decodeURIComponent(params.cert).toUpperCase();
+  const number = decodeURIComponent((await params).cert).toUpperCase();
   const supabase = publicClient();
   const { data: cert, error } = await supabase
     .from("certificates").select("*").eq("certificate_number", number).single();

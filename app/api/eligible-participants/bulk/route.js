@@ -1,7 +1,7 @@
 // POST /api/eligible-participants/bulk -> carga la lista de "día 4" (Excel/CSV)
 // Mismo patrón de lectura que /api/certificates/bulk. Upsert por email.
 import { NextResponse } from "next/server";
-import * as XLSX from "xlsx";
+import { readSpreadsheetRows } from "../../../../lib/spreadsheet.js";
 import { checkAdmin } from "../../../../lib/auth.js";
 import { adminClient } from "../../../../lib/supabase.js";
 
@@ -42,14 +42,9 @@ export async function POST(request) {
   }
 
   const buf = Buffer.from(await file.arrayBuffer());
-  const name = (file.name || "").toLowerCase();
   let rows;
   try {
-    const wb = name.endsWith(".csv")
-      ? XLSX.read(buf.toString("utf8"), { type: "string" })
-      : XLSX.read(buf, { type: "buffer" });
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    rows = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
+    rows = await readSpreadsheetRows(buf, file.name);
   } catch (e) {
     return NextResponse.json({ error: "No se pudo leer el archivo: " + e.message }, { status: 400 });
   }
