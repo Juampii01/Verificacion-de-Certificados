@@ -227,6 +227,22 @@ export default function Admin() {
     setRowBusy((b) => ({ ...b, [cert.certificate_number]: null }));
   }
 
+  async function deleteCert(cert) {
+    const name = cert.full_name || `${cert.first_name || ""} ${cert.last_name || ""}`.trim();
+    if (!window.confirm(`¿Eliminar el certificado ${cert.certificate_number} de ${name}?\n\nDeja de verificarse y su número lo toma el próximo certificado que se emita. No se puede deshacer.`)) return;
+    setRowBusy((b) => ({ ...b, [cert.certificate_number]: "delete" })); setOut("");
+    try {
+      const res = await fetch(`/api/certificates/${encodeURIComponent(cert.certificate_number)}/delete`, { method: "POST", headers: { "x-admin-token": token } });
+      const j = await res.json();
+      if (!res.ok) setOut(`ERROR (${cert.certificate_number}): ` + (j.error || "no se pudo eliminar"));
+      else {
+        setOut(`✓ Certificado ${j.deleted} eliminado. El número ${String(j.freedSeq || "").padStart(4, "0")} lo toma el próximo certificado.`);
+        setCerts((list) => (list || []).filter((c) => c.certificate_number !== cert.certificate_number));
+      }
+    } catch (err) { setOut("ERROR: " + err.message); }
+    setRowBusy((b) => ({ ...b, [cert.certificate_number]: null }));
+  }
+
   async function downloadCertPdf(cert) {
     setRowBusy((b) => ({ ...b, [cert.certificate_number]: "pdf" })); setOut("");
     try {
@@ -491,6 +507,13 @@ export default function Admin() {
                             onClick={() => downloadCertPdf(c)}
                           >
                             {rb === "pdf" ? "Descargando..." : "Descargar PDF"}
+                          </button>
+                          <button
+                            className="btn" style={{ padding: "6px 10px", fontSize: 13, marginLeft: 6, background: "#E42D2C" }}
+                            disabled={!!rb}
+                            onClick={() => deleteCert(c)}
+                          >
+                            {rb === "delete" ? "Eliminando..." : "Eliminar"}
                           </button>
                         </td>
                       </tr>
